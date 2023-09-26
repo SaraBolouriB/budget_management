@@ -1,0 +1,13 @@
+{
+    "canisters": {
+        "budget_management": {
+            "type": "custom",
+            "build": "npx azle budget_management",
+            "root": "src",
+            "ts": "src/index.ts",
+            "candid": "src/index.did",
+            "wasm": ".azle/budget_management/budget_management.wasm.gz"
+        }
+    }
+}
+
