@@ -6,7 +6,15 @@ type personalInfo = Record<{
     username: string,
 }>;
 
-export class User{
+interface user {
+    getID: () => Principal;
+    getAllAccounts: () => Account[];
+    getPersonalInformation: () => Result<Record<{}>, string>;
+    addAccount: (account: Account) => Result<string, string>;
+    removeAccount: (account: Account) => Result<string, string>;
+}
+
+export class User implements user{
     private id: Principal;
     private username: string;
     private accounts: Account[];
