@@ -1,6 +1,6 @@
 import { $query, $update, Record, StableBTreeMap, match, Result, Service, Principal, Variant, CallResult} from 'azle';
-import { User } from './User';
-import { Account } from './Account';
+import {User} from './User';
+import {Account} from './Account';
 
 
 const userStorage = new StableBTreeMap<Principal, User>(0, 44, 1024);
