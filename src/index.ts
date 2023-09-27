@@ -1,17 +1,17 @@
-import { $query, $update, Record, StableBTreeMap, match, Result, Principal, Variant, nat} from 'azle';
+import { $query, $update, Record, StableBTreeMap, match, Result, Principal, Variant, nat, Vec} from 'azle';
 
 type User = Record<{
     id: Principal;
     username: string;
-    accountsID: Principal[]
-}>
+    accountsID: Vec<Principal>
+}>;
 
 type Account = Record<{
     id: Principal;
-    owner: User;
+    owner: Principal;
     totalBalance: number;
     totalExpenses: number;
-}>
+}>;
 
 
 const userStorage = new StableBTreeMap<Principal, User>(0, 44, 1024);
@@ -59,23 +59,24 @@ export function deleteUser(userID: Principal) : Result<User, Variant<{UserDoesNo
     });
 }
 
+//PROBLEM
 $update
 export function addAccount(userID: Principal, amountOfMoney: number): Result<Account, Variant<{UserDoesNotExist: Principal}>> {
     return match(userStorage.get(userID), {
         Some: (user) => {
             const account: Account = {
                 id: generateId(),
-                owner: user,
+                owner: user.id,
                 totalBalance: amountOfMoney,
                 totalExpenses: 0
             }
-            accountStorage.insert(account.id, account);
-
             const userUpdate: User = {
                 ...user,
                 accountsID: [...user.accountsID, account.id]
             }
-            userStorage.insert(userUpdate.id, userUpdate)
+            userStorage.insert(userUpdate.id, userUpdate);
+
+            accountStorage.insert(account.id, account);
 
             return {
                 Ok: account
@@ -91,14 +92,13 @@ export function addAccount(userID: Principal, amountOfMoney: number): Result<Acc
 }
 
 $update
-export function removeAccount(userID: Principal, account: Account): Result<Account, Variant<{AccountDoesNotExist: Principal;
+export function removeAccount(userID: Principal, accountID: Principal): Result<Account, Variant<{AccountDoesNotExist: Principal;
                                                                                              UserDoesNotExist: Principal;}>>
 {
     return match(userStorage.get(userID), {
         Some: (user) => {
-            return match(accountStorage.remove(account.id), {
+            return match(accountStorage.get(accountID), {
                 Some: (deletedAccount) => {
-                    // user.removeAccount(account);
                     const updateUser: User = {
                         ...user,
                         accountsID: user.accountsID.filter((accountsID) => 
@@ -114,7 +114,7 @@ export function removeAccount(userID: Principal, account: Account): Result<Accou
                 },
                 None: () => {
                     return {
-                        Err: {AccountDoesNotExist: account.id}
+                        Err: {AccountDoesNotExist: accountID}
                     }
                 }
             })
@@ -138,7 +138,7 @@ export function deposit(accountID: Principal, amountOfMoney: number) : Result<nu
             accountStorage.insert(updateAccount.id, updateAccount);
 
             return {
-                Ok: account.totalBalance
+                Ok: updateAccount.totalBalance
             }
         },
         None: () => {
@@ -161,7 +161,7 @@ export function withdraw(accountID: Principal, price: number) : Result<number, V
             accountStorage.insert(updateAccount.id, updateAccount);
 
             return {
-                Ok: account.totalBalance
+                Ok: updateAccount.totalBalance
             }
         },
         None: () => {
@@ -170,36 +170,6 @@ export function withdraw(accountID: Principal, price: number) : Result<number, V
             }
         }
     });
-}
-
-$query
-export function getAccountInfo(accountID: Principal): Result<Record<{}>, Variant<{AccountDoesNotExist: Principal}>> {
-    return match(accountStorage.get(accountID), {
-        Some: (account) => {
-            return {
-                Ok: account
-            }
-        },
-        None: () => {return {
-            Err: {AccountDoesNotExist: accountID}
-        }}
-    });
-};
-
-$query
-export function getPersonalInfo(userID: Principal): Result<Record<{}>, Variant<{UserDoesNotExist: Principal}>> {
-    return match(userStorage.get(userID), {
-        Some: (user) => {
-            return {
-                Ok: user
-            }
-        },
-        None: () => {
-            return {
-                Err: {UserDoesNotExist: userID}
-            }
-        }
-    })
 }
 
 $query
@@ -234,6 +204,69 @@ export function getTotalBalance(userID: Principal): Result<number, Variant<{User
         }
     })
 }
+
+$query
+export function getAllAccountInfo(userID: Principal): Result<Vec<Account>, Variant<{AccountDoesNotExist: Principal,
+                                                                                    UserDoesNotExist: Principal}>> 
+{
+    return match(userStorage.get(userID), {
+        Some: (user) => {
+            let accountsInfo: Vec<Account> = [];
+            user.accountsID.forEach((accountid) => {
+                return match(accountStorage.get(accountid), {
+                    Some: (account) => {
+                        accountsInfo.push(account);
+                    },
+                    None: () => {
+                        return {
+                            Err: {AccountDoesNotExist: accountid}
+                        }
+                    }
+                })
+            })
+            return {
+                Ok: accountsInfo
+            }
+        },
+        None: () => {
+            return {
+                Err: {UserDoesNotExist: userID}
+            }
+        }
+    })
+}
+
+$query
+export function getAccountInfo(accountID: Principal): Result<Account, Variant<{AccountDoesNotExist: Principal}>> {
+    return match(accountStorage.get(accountID), {
+        Some: (account) => {
+            return {
+                Ok: account
+            }
+        },
+        None: () => {return {
+            Err: {AccountDoesNotExist: accountID}
+        }}
+    });
+};
+
+$query
+export function getPersonalInfo(userID: Principal): Result<User, Variant<{UserDoesNotExist: Principal}>> {
+    return match(userStorage.get(userID), {
+        Some: (user) => {
+            return {
+                Ok: user
+            }
+        },
+        None: () => {
+            return {
+                Err: {UserDoesNotExist: userID}
+            }
+        }
+    })
+}
+
+
 
 
 
