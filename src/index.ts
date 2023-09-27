@@ -1,31 +1,52 @@
-import { $query, $update, Record, StableBTreeMap, match, Result, Service, Principal, Variant, CallResult} from 'azle';
-import {User} from './User';
-import {Account} from './Account';
+import { $query, $update, Record, StableBTreeMap, match, Result, Principal, Variant, nat} from 'azle';
+
+type User = Record<{
+    id: Principal;
+    username: string;
+    accountsID: Principal[]
+}>
+
+type Account = Record<{
+    id: Principal;
+    owner: User;
+    totalBalance: number;
+    totalExpenses: number;
+}>
 
 
 const userStorage = new StableBTreeMap<Principal, User>(0, 44, 1024);
-const accountStorage = new StableBTreeMap<Principal, Account>(0, 44, 1024);
+const accountStorage = new StableBTreeMap<Principal, Account>(1, 44, 1024);
 
+
+function generateId(): Principal {
+    const randomBytes = new Array(29)
+        .fill(0)
+        .map((_) => Math.floor(Math.random() * 256));
+
+    return Principal.fromUint8Array(Uint8Array.from(randomBytes));
+}
 
 
 $update
 export function createUser(username: string,): Result<User, string> {
-    const user = new User(username);
-    userStorage.insert(user.getID(), user);
+    const userID = generateId();
+    const user : User = {
+        id: userID,
+        username: username,
+        accountsID: []
+    }
+    userStorage.insert(user.id, user);
     return Result.Ok<User, string>(user);
 }
 
 $update
 export function deleteUser(userID: Principal) : Result<User, Variant<{UserDoesNotExist: Principal}>> {
-    const user = userStorage.get(userID);
-
-    return match(user, {
+    return match(userStorage.get(userID), {
         Some: (user) => {
-            user.getAllAccounts().forEach((Account) => {
-                accountStorage.remove(Account.getID());
-                user.removeAccount(Account);
+            user.accountsID.forEach((account) => {
+                accountStorage.remove(account);
             });
-            userStorage.remove(userID);
+            userStorage.remove(user.id);
             return {
                 Ok: user
             }
@@ -42,9 +63,19 @@ $update
 export function addAccount(userID: Principal, amountOfMoney: number): Result<Account, Variant<{UserDoesNotExist: Principal}>> {
     return match(userStorage.get(userID), {
         Some: (user) => {
-            const account = new Account(user,amountOfMoney);
-            accountStorage.insert(account.getID(), account);
-            user.addAccount(account);
+            const account: Account = {
+                id: generateId(),
+                owner: user,
+                totalBalance: amountOfMoney,
+                totalExpenses: 0
+            }
+            accountStorage.insert(account.id, account);
+
+            const userUpdate: User = {
+                ...user,
+                accountsID: [...user.accountsID, account.id]
+            }
+            userStorage.insert(userUpdate.id, userUpdate)
 
             return {
                 Ok: account
@@ -64,17 +95,26 @@ export function removeAccount(userID: Principal, account: Account): Result<Accou
                                                                                              UserDoesNotExist: Principal;}>>
 {
     return match(userStorage.get(userID), {
-        Some: (owner) => {
-            return match(accountStorage.remove(account.getID()), {
+        Some: (user) => {
+            return match(accountStorage.remove(account.id), {
                 Some: (deletedAccount) => {
-                    owner.removeAccount(account);
+                    // user.removeAccount(account);
+                    const updateUser: User = {
+                        ...user,
+                        accountsID: user.accountsID.filter((accountsID) => 
+                            accountsID.toText() !== deletedAccount.id.toText()
+                        )
+                    }
+                    userStorage.insert(updateUser.id, updateUser);
+                    accountStorage.remove(deletedAccount.id);
+
                     return {
-                        Ok: account
+                        Ok: deletedAccount
                     }
                 },
                 None: () => {
                     return {
-                        Err: {AccountDoesNotExist: account.getID()}
+                        Err: {AccountDoesNotExist: account.id}
                     }
                 }
             })
@@ -91,9 +131,14 @@ $update
 export function deposit(accountID: Principal, amountOfMoney: number) : Result<number, Variant<{AccountDoesNotExist: Principal}>> {
     return match(accountStorage.get(accountID), {
         Some: (account) => {
-            let updatedBalance = account.deposit(amountOfMoney);
+            const updateAccount: Account = {
+                ...account,
+                totalBalance: account.totalBalance + amountOfMoney
+            }
+            accountStorage.insert(updateAccount.id, updateAccount);
+
             return {
-                Ok: updatedBalance
+                Ok: account.totalBalance
             }
         },
         None: () => {
@@ -106,12 +151,17 @@ export function deposit(accountID: Principal, amountOfMoney: number) : Result<nu
 
 $update
 export function withdraw(accountID: Principal, price: number) : Result<number, Variant<{AccountDoesNotExist: Principal}>> {
-
     return match(accountStorage.get(accountID), {
         Some: (account) => {
-            let updatedBalance = account.withdraw(price);
+            const updateAccount: Account = {
+                ...account,
+                totalBalance: account.totalBalance - price,
+                totalExpenses: account.totalExpenses + price
+            }
+            accountStorage.insert(updateAccount.id, updateAccount);
+
             return {
-                Ok: updatedBalance
+                Ok: account.totalBalance
             }
         },
         None: () => {
@@ -127,7 +177,7 @@ export function getAccountInfo(accountID: Principal): Result<Record<{}>, Variant
     return match(accountStorage.get(accountID), {
         Some: (account) => {
             return {
-                Ok: account.getAccountInformation()
+                Ok: account
             }
         },
         None: () => {return {
@@ -141,7 +191,7 @@ export function getPersonalInfo(userID: Principal): Result<Record<{}>, Variant<{
     return match(userStorage.get(userID), {
         Some: (user) => {
             return {
-                Ok: user.getPersonalInformation()
+                Ok: user
             }
         },
         None: () => {
@@ -153,13 +203,24 @@ export function getPersonalInfo(userID: Principal): Result<Record<{}>, Variant<{
 }
 
 $query
-export function getTotalBalance(userID: Principal): Result<number, Variant<{UserDoesNotExist: Principal}>> {
+export function getTotalBalance(userID: Principal): Result<number, Variant<{UserDoesNotExist: Principal, 
+                                                                            AccountDoesNotExist: Principal}>>
+{
     return match(userStorage.get(userID), {
         Some: (user) => {
-            const accounts = user.getAllAccounts();
-            let totalBalance = 0;
-            accounts.forEach((account) => {
-                totalBalance += account.getTotalBalance();
+
+            let totalBalance: number = 0;
+            user.accountsID.forEach((accountId) => {
+                return match(accountStorage.get(accountId), {
+                    Some: (account) => {
+                        totalBalance += account.totalBalance;
+                    },
+                    None: () => {
+                        return {
+                            Err: {AccountDoesNotExist: accountId}
+                        }
+                    }
+                })
             })
 
             return {
@@ -173,6 +234,8 @@ export function getTotalBalance(userID: Principal): Result<number, Variant<{User
         }
     })
 }
+
+
 
 
 
