@@ -1,47 +1,30 @@
 # budget_management
 
-Welcome to your first Azle project! This example project will help you to deploy your first canister (application) to the Internet Computer (IC) decentralized cloud. It is a simple getter/setter canister. You can always refer to [The Azle Book](https://demergent-labs.github.io/azle/) for more in-depth documentation.
+This code provides a simple budget management application in a distributed system. It allows end-user to create a profile, which includes personal information and all accounts created by the end-user. The end-user is able to manage its budget in this application by adding his/her expenses.
+Each user could add a new account with a balance as a total balance, and then deposit or withdraw the amount of money in it. In the end, the end-user could check the total balance of his/her accounts.
 
-`dfx` is the tool you will use to interact with the IC locally and on mainnet. If you don't already have it installed:
+
+# Run the Project
+- Clone the peoject
 
 ```bash
-npm run dfx_install
+git clone https://github.com/SaraBolouriB/budget_management.git
 ```
 
-Next you will want to start a replica, which is a local instance of the IC that you can deploy your canisters to:
+- Install dependencies:
 
 ```bash
-npm run replica_start
+nmp install
 ```
 
-If you ever want to stop the replica:
+- Start DFX
 
 ```bash
-npm run replica_stop
+dfx start --clean
 ```
 
-Now you can deploy your canister locally:
+- Deploy the canister
 
 ```bash
-npm install
-npm run canister_deploy_local
-```
-
-To call the methods on your canister:
-
-```bash
-npm run canister_call_get_message
-npm run canister_call_set_message
-```
-
-If you run the above commands and then call `npm run canister_call_get_message` you should see:
-
-```bash
-("Hello world!")
-```
-
-Assuming you have [created a cycles wallet](https://internetcomputer.org/docs/current/developer-docs/quickstart/network-quickstart) and funded it with cycles, you can deploy to mainnet like this:
-
-```bash
-npm run canister_deploy_mainnet
+dfx deploy
 ```

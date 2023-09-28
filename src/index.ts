@@ -59,7 +59,6 @@ export function deleteUser(userID: Principal) : Result<User, Variant<{UserDoesNo
     });
 }
 
-//PROBLEM
 $update
 export function addAccount(userID: Principal, amountOfMoney: number): Result<Account, Variant<{UserDoesNotExist: Principal}>> {
     return match(userStorage.get(userID), {
@@ -70,13 +69,13 @@ export function addAccount(userID: Principal, amountOfMoney: number): Result<Acc
                 totalBalance: amountOfMoney,
                 totalExpenses: 0
             }
+            accountStorage.insert(account.id, account);
+
             const userUpdate: User = {
                 ...user,
                 accountsID: [...user.accountsID, account.id]
             }
             userStorage.insert(userUpdate.id, userUpdate);
-
-            accountStorage.insert(account.id, account);
 
             return {
                 Ok: account
@@ -150,19 +149,28 @@ export function deposit(accountID: Principal, amountOfMoney: number) : Result<nu
 }
 
 $update
-export function withdraw(accountID: Principal, price: number) : Result<number, Variant<{AccountDoesNotExist: Principal}>> {
+export function withdraw(accountID: Principal, price: number) : Result<number, Variant<{AccountDoesNotExist: Principal, MorethanTotalBalance: string}>> {
     return match(accountStorage.get(accountID), {
         Some: (account) => {
-            const updateAccount: Account = {
-                ...account,
-                totalBalance: account.totalBalance - price,
-                totalExpenses: account.totalExpenses + price
+            let check = price <= account.totalBalance;
+            if (check == true) {
+                const updateAccount: Account = {
+                    ...account,
+                    totalBalance: account.totalBalance - price,
+                    totalExpenses: account.totalExpenses + price
+                }
+                accountStorage.insert(updateAccount.id, updateAccount);
+    
+                return {
+                    Ok: updateAccount.totalBalance
+                }
             }
-            accountStorage.insert(updateAccount.id, updateAccount);
-
-            return {
-                Ok: updateAccount.totalBalance
+            else {
+                return {
+                    Err: {MorethanTotalBalance: 'The price is more that you balance. The totalBalance is ' + account.totalBalance}
+                }
             }
+            
         },
         None: () => {
             return {
