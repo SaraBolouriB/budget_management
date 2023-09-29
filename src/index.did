@@ -1,0 +1,37 @@
+type Account = record {
+  id : text;
+  owner : principal;
+  totalExpenses : float64;
+  totalBalance : float64;
+};
+type User = record { id : text; accountsID : vec text; username : text };
+type _AzleResult = variant { Ok : Account; Err : text };
+type _AzleResult_1 = variant { Ok : User; Err : text };
+type _AzleResult_2 = variant { Ok : float64; Err : text };
+type _AzleResult_3 = variant {
+  Ok : Account;
+  Err : _InlineGetAccountInfoReturnTypeTypeArg1;
+};
+type _AzleResult_4 = variant { Ok : vec Account; Err : text };
+type _AzleResult_5 = variant {
+  Ok : User;
+  Err : _InlineGetPersonalInfoReturnTypeTypeArg1;
+};
+type _InlineGetAccountInfoReturnTypeTypeArg1 = variant {
+  AccountDoesNotExist : text;
+};
+type _InlineGetPersonalInfoReturnTypeTypeArg1 = variant {
+  UserDoesNotExist : text;
+};
+service : () -> {
+  addAccount : (text, float64) -> (_AzleResult);
+  createUser : (text) -> (_AzleResult_1);
+  deleteUser : (text) -> (_AzleResult_1);
+  deposit : (text, float64) -> (_AzleResult_2);
+  getAccountInfo : (text) -> (_AzleResult_3) query;
+  getAllAccountInfo : (text) -> (_AzleResult_4) query;
+  getPersonalInfo : (text) -> (_AzleResult_5) query;
+  getTotalBalance : (text) -> (_AzleResult_2) query;
+  removeAccount : (text, text) -> (_AzleResult);
+  withdraw : (text, float64) -> (_AzleResult_2);
+}
